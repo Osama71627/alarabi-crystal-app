@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "452425299907",
+    "project_id": "alarabi-crystal",
+    "storage_bucket": "alarabi-crystal.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:452425299907:android:2dbf51b51a3976b11f6f76",
+        "android_client_info": {
+          "package_name": "com.alarabi.alarabi_crystal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoDou3ogT8y3iQLu3MFT6Te_F1Yp8UrRY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

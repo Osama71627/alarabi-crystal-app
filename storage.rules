@@ -1,0 +1,42 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+          .data.role == 'admin';
+    }
+
+    // ملاحظة: التخزين الفعلي للصور انتقل إلى Cloudinary (انظر
+    // functions/index.js: getCloudinarySignature) وهذه القواعد هنا
+    // للحماية الاحتياطية فقط في حال إعادة تفعيل Firebase Storage مستقبلاً —
+    // القاعدة السابقة كانت تسمح لأي مستخدم مسجّل بالكتابة على أي مسار
+    // بالباكيت بالكامل، وهذا مُصلَح الآن بحصر كل مسار بصاحبه/الإدارة.
+
+    // الصور الرمزية: كل مستخدم يكتب فقط داخل مجلده الخاص
+    match /avatars/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(uid);
+    }
+
+    // صور المنتجات: قراءة عامة، كتابة للإدارة فقط
+    match /products/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // أي مسار آخر غير معرّف صراحة: مرفوض افتراضياً
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

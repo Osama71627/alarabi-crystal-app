@@ -1,0 +1,216 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid))
+          .data.role == 'admin';
+    }
+
+    // الكتالوج العام — للقراءة للجميع، الكتابة للإدارة فقط.
+    //
+    // ⚠️ تحديث المرحلة 11: أُغلق الاستثناء الذي كان يسمح للعميل المسجَّل
+    // بتخفيض stock وزيادة soldCount مباشرة (كان ضرورياً وقت إنشاء الطلب
+    // محلياً على الجهاز). إنشاء الطلب انتقل بالكامل لخادم موثوق
+    // (push-server/api/order.js) يكتب المخزون بامتيازات حساب خدمة تتجاوز
+    // هذه القواعد أصلاً — فلا حاجة لأي استثناء هنا بعد الآن، ولا يقدر أي
+    // عميل (حتى عبر Postman أو Firebase SDK مباشرة) تعديل stock أو
+    // soldCount أو rating أو reviewCount إطلاقاً إلا عبر حساب مدير.
+    match /products/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /categories/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // العروض — للقراءة للجميع، الكتابة للإدارة فقط
+    match /offers/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // الإشعارات — القراءة للمسجلين حسب استهداف كل مستند، الإنشاء/التعديل
+    // للإدارة فقط.
+    //
+    // ✅ إصلاح M1 (المرحلة 11): كل مستند يُقيَّم على حدة الآن —
+    // - target='all' أو 'category': عام لكل المسجّلين.
+    // - target='user': لصاحبه فقط (targetId == uid المتصل).
+    // - target='admin': للإدارة فقط.
+    // - المدير يقرأ كل شيء بلا قيد إضافي (يحتاجه سجل الإرسال في اللوحة).
+    //
+    // ⚠️ هذا يعني أن استعلاماً غير مُصفّى (أو مُصفّى بحقل غير مضمون الوجود
+    // ضمن شرط القاعدة) سيُرفض لأي مستخدم غير مدير. تعمّدنا استخدام الوصول
+    // المباشر (dot-notation لا get() بقيمة افتراضية) لأن القيمة الافتراضية
+    // تجعل محلّل أمان استعلامات Firestore "يثق" ضمنياً بأن أي مستند غير
+    // مقيَّد بالفلتر قد يطابق القيمة الافتراضية — فيسمح فعلياً باستعلام غير
+    // مُصفّى بالكامل (تحقّقنا من هذا تجريبياً وأزلناه فوراً). الوصول
+    // المباشر يفشل بأمان بدل ذلك عند أي غموض.
+    //
+    // العميل يستخدم استعلامين منفصلين، كلٌّ منهما يقيّد فعلياً كل حقل
+    // يعتمد عليه هذا الشرط: استعلام "العام" يقيّد target، واستعلام
+    // "الموجَّه لي" يقيّد target=='user' **و** targetId معاً — راجع
+    // lib/shared/services/notifications_feed.dart.
+    match /notifications/{docId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.target in ['all', 'category'] ||
+          (resource.data.target == 'user' &&
+            resource.data.targetId == request.auth.uid)
+        )
+      );
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // الكوبونات — القراءة للجميع (للتحقق قبل الدفع)، الكتابة كلها
+    // (بما فيها usedCount/usedBy عند الاستخدام) للإدارة فقط.
+    //
+    // ⚠️ تحديث المرحلة 11: أُغلق الاستثناء الذي كان يسمح للعميل بزيادة
+    // usedCount مباشرة عند الدفع محلياً. تسجيل استخدام الكوبون ينتقل الآن
+    // بالكامل لخادم /api/order (يكتب بامتيازات حساب خدمة تتجاوز هذه
+    // القواعد)، فلا حاجة لأي استثناء هنا — ولا يقدر أي عميل استنزاف حد
+    // الاستخدام مباشرة بعد الآن.
+    match /coupons/{code} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // الملف الشخصي + المفضلة (داخل مستند المستخدم)
+    // المالك يقدر يعدّل بيانات ملفه الشخصي فقط، وليس حقل "role" —
+    // تعيين/سحب صلاحية الإدارة لا يتم إلا يدوياً (Firebase Console)
+    // أو من مدير حالي، منعاً لتصعيد الصلاحيات الذاتي.
+    //
+    // ⚠️ تحديث المرحلة 11: أُزيل "points" من حقول المالك القابلة للتعديل
+    // (كان مسموحاً بالنقصان فقط، لاستخدامه أثناء دفع محلي قديم). خصم
+    // النقاط عند الدفع ومنحها عند التسليم كلاهما ينتقلان لخادم موثوق
+    // بامتيازات حساب خدمة — فلا يقدر أي عميل تعديل رصيد نقاطه مباشرة بعد
+    // الآن، لا بالزيادة ولا حتى بالنقصان.
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(uid) &&
+        (!('role' in request.resource.data) || request.resource.data.role == 'customer');
+      allow update: if isAdmin() ||
+        (isOwner(uid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'email', 'phone', 'avatar', 'addresses',
+                      'favorites', 'fcmTokens', 'lastNotifReadAt', 'createdAt']));
+      allow delete: if isAdmin();
+    }
+
+    // أكواد التحقق من البريد الإلكتروني — للخادم فقط (Cloud Functions عبر
+    // Admin SDK تتجاوز هذه القواعد أصلاً). ممنوع أي وصول من العميل مباشرة
+    // حتى لا يقدر أحد يقرأ الكود أو يزوّر حالة التحقق.
+    match /emailVerificationCodes/{uid} {
+      allow read, write: if false;
+    }
+
+    // السلة (معرّفها = معرّف المستخدم)
+    match /carts/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // الطلبات
+    //
+    // ⚠️ تحديث المرحلة 11: الإنشاء لم يعد يتم من العميل مباشرة إطلاقاً.
+    // خادم موثوق (push-server/api/order.js) يتحقق من هوية العميل عبر
+    // توقيع Firebase، يقرأ الأسعار/المخزون/الكوبون/العروض من Firestore
+    // طازجة، يحسب كل مبلغ بنفسه، ويكتب الطلب + يحجز المخزون + يستهلك
+    // الكوبون ذرّياً — بامتيازات حساب خدمة تتجاوز هذه القواعد أصلاً.
+    // النتيجة: `allow create: if false` هنا فعلياً تمنع أي إنشاء طلب من
+    // أي عميل (حتى عبر Postman أو Firebase SDK مباشرة)، ولا يعتمد الأمان
+    // على أن المستخدم يستخدم التطبيق الرسمي فقط.
+    // - القراءة لصاحب الطلب أو الإدارة.
+    // - التعديل (حالة الطلب/رقم التتبع) للإدارة فقط.
+    match /orders/{orderId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // سجل حركات نقاط الولاء — القراءة لصاحبها أو الإدارة.
+    // الكتابة للإدارة فقط: النقاط تُمنح من لوحة الإدارة عند تعليم الطلب
+    // "تم التوصيل" (لا توجد Cloud Functions على الخطة المجانية). العميل
+    // لا يقدر إنشاء أي حركة، ولا زيادة رصيده (انظر قاعدة users).
+    match /pointsLedger/{entryId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // تقييمات المنتجات — قراءة عامة، والكتابة (إنشاء/تعديل/حذف) بالكامل
+    // عبر خادم موثوق فقط (push-server/api/review.js) بامتيازات حساب خدمة.
+    //
+    // ⚠️ تحديث المرحلة 11: كانت الكتابة مسموحة مباشرة لصاحب التقييم، لكن
+    // هذا يعني أن متوسط تقييم المنتج (products.rating/reviewCount) لن
+    // يُعاد حسابه أبداً بلا خادم فعلي يراقب كل كتابة (هذه كانت أصل ثغرة
+    // M2 — الدالة الخادمية المفترضة لم تكن منشورة قط). الخادم الآن يتحقق
+    // من الهوية عبر توقيع Firebase، يمنع انتحال هوية عميل آخر، ويعيد حساب
+    // rating/reviewCount ذرّياً بعد كل إضافة/تعديل/حذف — فلا حاجة لأي
+    // كتابة مباشرة من العميل على هذه المجموعة بعد الآن.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // قائمة الأمنيات المشتركة — نسخة عامة القراءة من مفضلة المستخدم،
+    // يتحكم بها ويحدّثها صاحبها فقط
+    match /sharedWishlists/{uid} {
+      allow read: if true;
+      allow write: if isOwner(uid);
+    }
+
+    // الدعم المباشر — كل مستخدم يرى محادثته فقط، والإدارة ترى الكل.
+    // الرسالة تُنشأ فقط من صاحبها (senderId = المرسل الفعلي) وبالدور
+    // الصحيح (customer داخل محادثته، أو admin بأي محادثة). تعديل الرسائل
+    // مقصور على تحديد "مقروءة" فقط.
+    match /supportChats/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
+    match /supportChats/{uid}/messages/{messageId} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if request.resource.data.senderId == request.auth.uid &&
+        ((isOwner(uid) && request.resource.data.senderRole == 'customer') ||
+         (isAdmin() && request.resource.data.senderRole == 'admin'));
+      allow update: if (isOwner(uid) || isAdmin()) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if false;
+    }
+
+    // طلبات الاسترداد — العميل يُنشئ طلبه الخاص فقط بحالة "قيد الانتظار".
+    // القرار (موافقة/رفض) للمدير فقط، ومقصور على حقول القرار — لا يقدر
+    // تغيير صاحب الطلب أو مبلغه. لا يوجد استرداد مالي آلي لأن الدفع عند
+    // الاستلام/تحويل بنكي، فالإرجاع يتم يدوياً والقرار يُسجَّل هنا.
+    match /refundRequests/{requestId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resolvedAt', 'adminNote']) &&
+        request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
+    }
+  }
+}
