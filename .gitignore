@@ -54,10 +54,12 @@ app.*.map.json
 android/.gradle/
 .gradle/
 
-# push-server/ و firestore-tests/ مستودعا Git مستقلان بذاتهما (لهما
-# تاريخهما الخاص على GitHub) — لا تُدرَج هنا لتفادي تعارض git المتداخل
+# push-server/ و firestore-tests/ و admin-dashboard/ مستودعات Git مستقلة
+# بذاتها (لها تاريخها الخاص على GitHub) — لا تُدرَج هنا لتفادي تعارض git
+# المتداخل
 /push-server/
 /firestore-tests/
+/admin-dashboard/
 
 # إعدادات محلية لأداة Claude Code — خاصة بهذا الجهاز، ليست جزءاً من المشروع
 /.claude/
