@@ -33,4 +33,8 @@ class AppConstants {
   static const String hiveBoxFavorites = 'favorites_box';
   static const String hiveBoxSettings = 'settings_box';
   static const String hiveBoxCompare = 'compare_box';
+
+  /// صندوق صغير يحفظ معرّف صاحب السلة المحلية آخر مرة — يُستخدم لاكتشاف
+  /// سلة متبقية من حساب سابق عند إعادة تشغيل التطبيق (راجع CartService)
+  static const String hiveBoxCartOwner = 'cart_owner_box';
 }

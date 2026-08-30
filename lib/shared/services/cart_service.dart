@@ -181,8 +181,26 @@ class CartService {
     _box = await Hive.openBox<Map<dynamic, dynamic>>(
       AppConstants.hiveBoxCart,
     );
+    _ownerBox = await Hive.openBox<String>(AppConstants.hiveBoxCartOwner);
     _loadFromBox();
+
+    // حماية إضافية عند إعادة تشغيل التطبيق: لو كانت آخر سلة محفوظة تخص
+    // حساباً معيّناً (uid مسجَّل في _ownerBox) وليست بلا صاحب (زائر)، لا
+    // نعتبرها "سلة زائر" قابلة للترحيل التلقائي لأول من يسجّل دخوله —
+    // نُبقيها معلَّقة حتى يصل حدث المصادقة الفعلي في [setActiveUser]
+    // ويقارنها بهوية المستخدم الحقيقي. هذا يغلق فجوة تبقى فيها سلة حساب
+    // سابق ظاهرة بعد إغلاق التطبيق وإعادة فتحه بحساب آخر، لا فقط أثناء
+    // تبديل الحساب بلا إغلاق التطبيق (المُصلَح في setActiveUser مباشرة).
+    _pendingOwnerCheck = true;
   }
+
+  /// معرّف صاحب آخر سلة محفوظة محلياً — null يعني "سلة زائر" بلا حساب
+  Box<String>? _ownerBox;
+  static const _ownerKey = 'uid';
+
+  /// true من فتح التطبيق حتى أول استدعاء لـ [setActiveUser] — يمنع خلط
+  /// "سلة زائر حقيقية" بـ"سلة حساب سابق لم تُفرَّغ بعد" عند بدء التشغيل
+  bool _pendingOwnerCheck = false;
 
   void _loadFromBox() {
     _items.clear();
@@ -206,11 +224,51 @@ class CartService {
   }
 
   /// ربط السلة بمستخدم سحابي عند الدخول/الخروج
+  ///
+  /// ⚠️ إصلاح خلل حرج: كانت هذه الدالة عند تسجيل الخروج (uid=null) تكتفي
+  /// بتصفير _activeUid دون تفريغ _items أو صندوق Hive المحلي — فتبقى
+  /// سلة المستخدم الذي خرج ظاهرة **لأي مستخدم آخر يسجّل دخوله بعده على
+  /// نفس الجهاز**، بل وتُدفع فعلياً إلى سلته السحابية هو (لأن
+  /// syncFromCloud كانت تدفع _items الحالية لو رجعت سلة الحساب الجديد
+  /// فارغة من السحابة). الإصلاح: أي مغادرة لحساب مسجَّل فعلي (خروج، أو
+  /// دخول حساب آخر مباشرة) تُفرِّغ السلة محلياً أولاً. حالة الزائر الذي
+  /// يسجّل دخوله لأول مرة (previousUid == null) تبقى كما كانت تماماً —
+  /// سلته المحلية تُرحَّل لحسابه الجديد عمداً (راجع syncFromCloud).
   Future<void> setActiveUser(String? uid) async {
-    if (uid == _activeUid) return;
+    if (uid == _activeUid) {
+      _pendingOwnerCheck = false;
+      return;
+    }
+    final previousUid = _activeUid;
     _activeUid = uid;
+
+    // فحص لمرة واحدة فقط عند أول استدعاء بعد تشغيل التطبيق: هل السلة
+    // المحمَّلة من القرص فعلاً سلة زائر (بلا صاحب)، أم بقايا حساب سابق لم
+    // يُفرَّغ بعد (قبل هذا الإصلاح)؟ راجع الشرح عند _pendingOwnerCheck
+    final isFirstCallThisSession = _pendingOwnerCheck;
+    _pendingOwnerCheck = false;
+    final persistedOwner = _ownerBox?.get(_ownerKey) ?? '';
+    final staleForeignCart =
+        isFirstCallThisSession && persistedOwner.isNotEmpty && persistedOwner != (uid ?? '');
+
+    if (previousUid != null || staleForeignCart) {
+      await _clearLocalCartOnAccountSwitch();
+    }
+    await _ownerBox?.put(_ownerKey, uid ?? '');
+
     if (uid == null) return;
     await syncFromCloud(uid);
+  }
+
+  /// تفريغ السلة محلياً فقط (بلا أي كتابة على السحابة) عند مغادرة حساب —
+  /// راجع الشرح في [setActiveUser]
+  Future<void> _clearLocalCartOnAccountSwitch() async {
+    _items.clear();
+    _appliedCoupon = null;
+    _appliedOffer = null;
+    _manualOffer = false;
+    await _box?.clear();
+    _notify();
   }
 
   /// تحميل السلة من السحابة (مع ترحيل سلة الزائر المحلية عند أول دخول)
@@ -324,5 +382,6 @@ class CartService {
     _availableOffers = const [];
     _activeUid = null;
     _cloudSyncing = false;
+    _pendingOwnerCheck = false;
   }
 }
