@@ -62,6 +62,13 @@ class AuthService extends ChangeNotifier {
         final account = await _gateway.currentAccountInfo();
         _emailVerified = account.emailVerified;
         _currentUser = await _loadUser(uid);
+        // حساب أوقفته الإدارة (راجع lib/shared/models/app_user.dart) —
+        // نسجّل خروجه فوراً بصمت هنا (بلا BuildContext لعرض رسالة)؛
+        // signInWithEmail أدناه يعرض الرسالة الصريحة عند محاولة دخول جديدة
+        if (_currentUser?.disabled == true) {
+          await _gateway.signOut();
+          _currentUser = null;
+        }
       } catch (_) {
         _currentUser = null;
         _emailVerified = false;
@@ -104,8 +111,13 @@ class AuthService extends ChangeNotifier {
     required String password,
   }) async {
     final account = await _gateway.signInWithEmail(email, password);
+    final user = await _loadUser(account.uid);
+    if (user.disabled) {
+      await _gateway.signOut();
+      throw AuthException('تم إيقاف هذا الحساب من قبل الإدارة، تواصل مع الدعم');
+    }
     _emailVerified = account.emailVerified;
-    _currentUser = await _loadUser(account.uid);
+    _currentUser = user;
     notifyListeners();
     return _currentUser!;
   }

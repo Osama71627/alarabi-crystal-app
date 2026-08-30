@@ -15,6 +15,7 @@ class AppUser {
     this.favorites = const [],
     this.role = UserRole.customer,
     this.createdAt,
+    this.disabled = false,
   });
 
   final String uid;
@@ -26,6 +27,10 @@ class AppUser {
   final List<String> favorites;
   final UserRole role;
   final DateTime? createdAt;
+
+  /// حساب مُوقَف من الإدارة — يُمنع من تسجيل الدخول (راجع AuthService)
+  /// ومن إنشاء طلبات/مراجعات على الخادم الموثوق (راجع push-server)
+  final bool disabled;
 
   /// هل المستخدم مدير؟
   bool get isAdmin => role == UserRole.admin;
@@ -58,6 +63,7 @@ class AppUser {
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt'].toString())
           : null,
+      disabled: map['disabled'] as bool? ?? false,
     );
   }
 
@@ -71,6 +77,7 @@ class AppUser {
       'favorites': favorites,
       'role': role.name,
       'createdAt': createdAt?.toIso8601String(),
+      'disabled': disabled,
     };
   }
 
