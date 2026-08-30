@@ -9,15 +9,18 @@ import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../l10n/app_strings.dart';
 import '../../../../shared/data/demo_data.dart';
 import '../../../../shared/models/banner.dart';
+import '../../../../shared/models/category.dart';
 import '../../../../shared/models/offer.dart';
 import '../../../../shared/models/product.dart';
 import '../../../../shared/widgets/favorite_aware_card.dart';
 import '../../../../config/routes.dart';
 import '../../../../injection.dart';
+import '../../domain/repositories/banner_repository.dart';
 import '../../../offers/domain/repositories/offer_repository.dart';
 import '../../../offers/presentation/bloc/offer_bloc.dart';
 import '../../../offers/presentation/widgets/flash_countdown.dart';
 import '../../../offers/presentation/widgets/offers_marquee.dart';
+import '../../../products/domain/repositories/category_repository.dart';
 import '../../../products/domain/repositories/product_repository.dart';
 import '../../../products/presentation/bloc/product_bloc.dart';
 import '../../../notifications/presentation/widgets/notification_bell.dart';
@@ -328,29 +331,49 @@ class _HomeAppBar extends StatelessWidget {
 }
 
 /// البانر الدوار للعروض — بطاقة "hero" بخلفية صورة وزرّي دعوة لإجراء،
-/// مطابقة لتصميم arabicrystal.com. البيانات (العنوان/الوصف/الصورة/وجهة
-/// الضغط) تبقى بالكامل من bannersيديرها المدير — لا شيء هنا مُخترَع.
-class _BannerCarousel extends StatelessWidget {
+/// مطابقة لتصميم arabicrystal.com.
+///
+/// ⚠️ البيانات (العنوان/الوصف/الصورة/وجهة الضغط) تُقرأ من مجموعة
+/// `banners` في Firestore عبر [BannerRepository] — أي بانر يضيفه المدير
+/// من لوحة الإدارة (تطبيق فلاتر أو لوحة الويب) يظهر لكل المستخدمين فور
+/// نشره، بلا حاجة لأي تحديث للتطبيق. سابقاً كانت هذه القائمة ثابتة في
+/// الكود (DemoData.banners) ولا تتأثر بأي تعديل من لوحة الإدارة إطلاقاً —
+/// هذا الإصلاح يغلق تلك الفجوة. [DemoData.banners] تبقى فقط احتياطاً حين
+/// تكون مجموعة Firestore فارغة (متجر جديد لم يُضِف أي بانر بعد).
+class _BannerCarousel extends StatefulWidget {
   const _BannerCarousel();
 
   @override
-  Widget build(BuildContext context) {
-    final banners = DemoData.banners.where((b) => b.isActive).toList();
-    if (banners.isEmpty) return const SizedBox.shrink();
+  State<_BannerCarousel> createState() => _BannerCarouselState();
+}
 
-    return SizedBox(
-      height: 300,
-      child: PageView.builder(
-        padEnds: true,
-        controller: PageController(viewportFraction: 0.92),
-        itemCount: banners.length,
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: _BannerCard(data: banners[index]),
-          );
-        },
-      ),
+class _BannerCarouselState extends State<_BannerCarousel> {
+  late final Future<List<Banner>> _future =
+      sl<BannerRepository>().getBanners();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Banner>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final banners = snapshot.data ?? const <Banner>[];
+        if (banners.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 300,
+          child: PageView.builder(
+            padEnds: true,
+            controller: PageController(viewportFraction: 0.92),
+            itemCount: banners.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _BannerCard(data: banners[index]),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -502,78 +525,88 @@ class _BannerCard extends StatelessWidget {
   }
 }
 
-/// قسم "تسوّق حسب احتياجك" — نفس فئات ومسارات القسم السابق تماماً، بشكل
-/// شبكة بطاقات أكبر بدل شريط أفقي، مطابقاً لتصميم arabicrystal.com
-class _CategoriesSection extends StatelessWidget {
+/// قسم "تسوّق حسب احتياجك" — شبكة بطاقات فئات، مطابقة لتصميم
+/// arabicrystal.com بصرياً.
+///
+/// ⚠️ الفئات تُقرأ من مجموعة `categories` في Firestore عبر
+/// [CategoryRepository] (نفس المستودع المستخدَم في شاشة "كل الفئات")
+/// — أي فئة يضيفها أو يعدّلها المدير من لوحة الإدارة تظهر لكل المستخدمين
+/// فوراً بلا أي تحديث للتطبيق. سابقاً كانت هذه قائمة ثابتة في الكود
+/// بمعرّفات وهمية (cat_italian_crystal...) لا تطابق أي فئة حقيقية —
+/// هذا الإصلاح يغلق تلك الفجوة. [DemoData.categories] تبقى احتياطاً فقط
+/// حين تكون المجموعة فارغة (متجر جديد لم يُضِف أي فئة بعد).
+class _CategoriesSection extends StatefulWidget {
   const _CategoriesSection();
 
   @override
-  Widget build(BuildContext context) {
-    final categories = [
-      ('الكريستال الإيطالي', Icons.diamond_outlined, 'cat_italian_crystal'),
-      ('أدوات المائدة', Icons.restaurant, 'cat_cutlery'),
-      ('ديكور المنزل', Icons.chair_outlined, 'cat_decor'),
-      ('هدايا فاخرة', Icons.card_giftcard, 'cat_gifts'),
-      ('مزهريات', Icons.local_florist, 'cat_crystal_vases'),
-      ('جوائز وتذكارات', Icons.emoji_events, 'cat_trophies'),
-    ];
+  State<_CategoriesSection> createState() => _CategoriesSectionState();
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          child: Row(
-            children: [
-              Text(
-                AppStrings.shopByNeed,
-                style: Theme.of(context).textTheme.titleLarge,
+class _CategoriesSectionState extends State<_CategoriesSection> {
+  late final Future<List<Category>> _future =
+      sl<CategoryRepository>().getCategories();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Category>>(
+      future: _future,
+      builder: (context, snapshot) {
+        final categories = snapshot.data ?? const <Category>[];
+        if (categories.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                children: [
+                  Text(
+                    AppStrings.shopByNeed,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => context.push(AppRoutes.categories),
+                    child: const Text(AppStrings.viewAll),
+                  ),
+                ],
               ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => context.push(AppRoutes.categories),
-                child: const Text(AppStrings.viewAll),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.85,
             ),
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              return _CategoryTile(
-                icon: categories[index].$2,
-                label: categories[index].$1,
-                onTap: () => context.push(
-                  AppRoutes.productsByCategoryLink(categories[index].$3),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.85,
                 ),
-              );
-            },
-          ),
-        ),
-      ],
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return _CategoryTile(
+                    category: category,
+                    onTap: () => context.push(
+                      AppRoutes.productsByCategoryLink(category.id),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _CategoryTile({required this.category, required this.onTap});
 
-  final IconData icon;
-  final String label;
+  final Category category;
   final VoidCallback onTap;
 
   @override
@@ -589,20 +622,27 @@ class _CategoryTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.secondaryLight,
-                shape: BoxShape.circle,
+            ClipOval(
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: category.image.isNotEmpty
+                    ? NetworkImageWidget(imageUrl: category.image)
+                    : Container(
+                        color: AppColors.secondaryLight,
+                        child: Icon(
+                          Icons.diamond_outlined,
+                          size: 22,
+                          color: AppColors.secondary,
+                        ),
+                      ),
               ),
-              child: Icon(icon, size: 22, color: AppColors.secondary),
             ),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
-                label,
+                category.name,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

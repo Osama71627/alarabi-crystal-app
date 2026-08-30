@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'features/admin/data/repositories/firestore_admin_repository.dart';
 import 'features/admin/domain/repositories/admin_repository.dart';
+import 'features/home/domain/repositories/banner_repository.dart';
+import 'features/home/data/repositories/firestore_banner_repository.dart';
 import 'features/products/domain/repositories/category_repository.dart';
 import 'features/products/data/repositories/firestore_category_repository.dart';
 import 'features/products/domain/repositories/product_repository.dart';
@@ -79,6 +81,11 @@ Future<void> setupLocator() async {
   // مستودع الفئات
   sl.registerLazySingleton<CategoryRepository>(
     () => FirestoreCategoryRepository(),
+  );
+
+  // مستودع بانرات الصفحة الرئيسية
+  sl.registerLazySingleton<BannerRepository>(
+    () => FirestoreBannerRepository(),
   );
 
   // مستودع العروض
