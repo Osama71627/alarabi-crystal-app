@@ -122,6 +122,21 @@ class AuthService extends ChangeNotifier {
     return _currentUser!;
   }
 
+  /// تسجيل الدخول بحساب Google — ينشئ حساب Firestore تلقائياً لأول دخول
+  /// (نفس مسار _loadUser المستخدَم لبقية طرق الدخول)
+  Future<AppUser> signInWithGoogle() async {
+    final account = await _gateway.signInWithGoogle();
+    final user = await _loadUser(account.uid);
+    if (user.disabled) {
+      await _gateway.signOut();
+      throw AuthException('تم إيقاف هذا الحساب من قبل الإدارة، تواصل مع الدعم');
+    }
+    _emailVerified = account.emailVerified;
+    _currentUser = user;
+    notifyListeners();
+    return _currentUser!;
+  }
+
   /// إنشاء حساب جديد بالبريد وكلمة المرور
   Future<AppUser> registerWithEmail({
     required String name,

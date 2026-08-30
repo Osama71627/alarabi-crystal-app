@@ -259,6 +259,11 @@ class FakeAuthGateway implements AuthGateway {
   }
 
   @override
+  Future<AuthAccount> signInWithGoogle() async {
+    throw AuthException('الدخول بجوجل غير مدعوم في هذا الاختبار');
+  }
+
+  @override
   Future<void> signOut() => Future.sync(() => signOutFake());
 
   @override

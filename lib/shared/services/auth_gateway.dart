@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/app_user.dart';
 import 'auth_exception.dart';
@@ -45,6 +46,11 @@ abstract class AuthGateway {
     required String email,
     required String password,
   });
+
+  /// تسجيل الدخول بحساب Google — يفتح نافذة اختيار الحساب، وترمي
+  /// [AuthException] عند الإلغاء أو الفشل. يُنشئ حساباً جديداً تلقائياً
+  /// في Firebase Auth لأول دخول (سلوك signInWithCredential القياسي).
+  Future<AuthAccount> signInWithGoogle();
 
   /// تسجيل الخروج
   Future<void> signOut();
@@ -111,8 +117,44 @@ class FirebaseAuthGateway implements AuthGateway {
     }
   }
 
+  /// ⚠️ يتطلب إعداداً لمرة واحدة على Firebase Console لكل بيئة توقيع
+  /// (تصحيح/إصدار): Project settings > عام > تطبيقك (Android) > أضف
+  /// بصمة SHA-1 (و SHA-256) لشهادة التوقيع، ثم نزّل google-services.json
+  /// المحدَّث. بدون هذه الخطوة يفشل الدخول بجوجل برسالة عامة (غالباً
+  /// ApiException: 10 / DEVELOPER_ERROR) رغم صحة الكود تماماً.
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<AuthAccount> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // العميل أغلق نافذة الاختيار بنفسه — ليس خطأً يستحق رسالة حمراء
+        throw AuthException('تم إلغاء تسجيل الدخول');
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      return _accountOf(userCredential.user);
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(_mapAuthError(e.code));
+    } on AuthException {
+      rethrow;
+    } catch (_) {
+      throw AuthException('تعذر تسجيل الدخول بحساب Google، حاول مرة أخرى');
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    // نسجّل خروج Google أيضاً — وإلا يعيد signIn() نفس الحساب صامتاً في
+    // المرة القادمة بلا نافذة اختيار، فيبدو وكأن تسجيل الخروج لم يعمل
+    await _googleSignIn.signOut().catchError((_) => null);
+    await _auth.signOut();
+  }
 
   @override
   Future<void> resetPassword(String email) async {
