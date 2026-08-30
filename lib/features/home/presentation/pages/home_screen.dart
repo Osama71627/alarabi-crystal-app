@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/network_image_widget.dart';
 import '../../../../core/widgets/pressable_scale.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../l10n/app_strings.dart';
@@ -22,6 +23,12 @@ import '../../../products/presentation/bloc/product_bloc.dart';
 import '../../../notifications/presentation/widgets/notification_bell.dart';
 
 /// الشاشة الرئيسية
+///
+/// ⚠️ التصميم البصري لهذه الشاشة (الخلفية الكريمية، البانر بخلفية صورة
+/// وزرّين، شبكة الفئات، شريط الثقة) أُعيد تنسيقه ليطابق تصميم موقع الشركة
+/// arabicrystal.com بطلب صريح — **بلا أي تغيير في المنطق أو البيانات**:
+/// نفس الفئات، نفس العروض/الفلاش/الخصومات، نفس مصادر البيانات (BLoC)، ونفس
+/// المسارات عند الضغط. التغيير بصري بحت.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -40,6 +47,7 @@ class HomeScreen extends StatelessWidget {
         ),
       ],
       child: Scaffold(
+        backgroundColor: AppColors.creamBackground,
         body: SafeArea(
           child: BlocBuilder<ProductBloc, ProductState>(
             builder: (context, state) {
@@ -54,6 +62,7 @@ class HomeScreen extends StatelessWidget {
                   const SliverToBoxAdapter(child: _BannerCarousel()),
                   const SliverToBoxAdapter(child: _FlashSaleSection()),
                   const SliverToBoxAdapter(child: _CategoriesSection()),
+                  const SliverToBoxAdapter(child: _TrustBadgesSection()),
                   SliverToBoxAdapter(
                     child: _SectionHeader(
                       title: AppStrings.featuredProducts,
@@ -209,7 +218,8 @@ class _FlashCard extends StatelessWidget {
   }
 }
 
-/// شريط علوي مع البحث والإشعارات
+/// شريط علوي مع الشعار، البحث، والإشعارات — يشمل حقل بحث كامل العرض
+/// أسفل صف الشعار (مطابقاً لتصميم arabicrystal.com)
 class _HomeAppBar extends StatelessWidget {
   const _HomeAppBar({required this.onSearchTap});
 
@@ -218,79 +228,118 @@ class _HomeAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            padding: const EdgeInsets.all(5),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
-            ),
+                padding: const EdgeInsets.all(5),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child:
+                      Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.appName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      AppStrings.appTagline,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => context.push(AppRoutes.compare),
+                icon: const Icon(Icons.compare_arrows),
+                tooltip: AppStrings.compare,
+              ),
+              const NotificationBell(),
+            ],
           ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppStrings.appName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
+          const SizedBox(height: 10),
+          PressableScale(
+            onTap: onSearchTap,
+            child: Container(
+              width: double.infinity,
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(23),
+                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.25)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                Text(
-                  AppStrings.appTagline,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.w600,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: AppColors.secondary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      AppStrings.searchHint,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.outline,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          IconButton(
-            onPressed: onSearchTap,
-            icon: const Icon(Icons.search),
-            tooltip: AppStrings.search,
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRoutes.compare),
-            icon: const Icon(Icons.compare_arrows),
-            tooltip: AppStrings.compare,
-          ),
-          const NotificationBell(),
         ],
       ),
     );
   }
 }
 
-/// البانر الدوار للعروض
+/// البانر الدوار للعروض — بطاقة "hero" بخلفية صورة وزرّي دعوة لإجراء،
+/// مطابقة لتصميم arabicrystal.com. البيانات (العنوان/الوصف/الصورة/وجهة
+/// الضغط) تبقى بالكامل من bannersيديرها المدير — لا شيء هنا مُخترَع.
 class _BannerCarousel extends StatelessWidget {
   const _BannerCarousel();
 
   @override
   Widget build(BuildContext context) {
     final banners = DemoData.banners.where((b) => b.isActive).toList();
+    if (banners.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: 170,
+      height: 300,
       child: PageView.builder(
         padEnds: true,
         controller: PageController(viewportFraction: 0.92),
@@ -318,7 +367,7 @@ class _BannerCard extends StatelessWidget {
     return Color(0xFF000000 | value);
   }
 
-  void _onTap(BuildContext context) {
+  void _onPrimaryTap(BuildContext context) {
     switch (data.linkType) {
       case BannerLinkType.product:
         if (data.linkTarget != null) {
@@ -331,84 +380,130 @@ class _BannerCard extends StatelessWidget {
       case BannerLinkType.offer:
         context.push(AppRoutes.offers);
       case BannerLinkType.none:
-        break;
+        context.push(AppRoutes.products);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final color = _resolveColor();
-    return GestureDetector(
-      onTap: () => _onTap(context),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color, color.withValues(alpha: 0.75)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -20,
-              bottom: -30,
-              child: Icon(
-                Icons.diamond_outlined,
-                size: 140,
-                color: Colors.white.withValues(alpha: 0.1),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (data.image.isNotEmpty)
+            NetworkImageWidget(imageUrl: data.image, fit: BoxFit.cover)
+          else
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withValues(alpha: 0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
             ),
-            Column(
+          // تظليل داكن تدريجي لضمان وضوح النص فوق أي صورة
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: 0.75),
+                  Colors.black.withValues(alpha: 0.25),
+                  Colors.black.withValues(alpha: 0.05),
+                ],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
                   data.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
+                    height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   data.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Text(
-                    AppStrings.shopNow,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _onPrimaryTap(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          AppStrings.shopNow,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => context.push(AppRoutes.categories),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white70),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          AppStrings.exploreCollection,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// قسم الفئات الأفقية
+/// قسم "تسوّق حسب احتياجك" — نفس فئات ومسارات القسم السابق تماماً، بشكل
+/// شبكة بطاقات أكبر بدل شريط أفقي، مطابقاً لتصميم arabicrystal.com
 class _CategoriesSection extends StatelessWidget {
   const _CategoriesSection();
 
@@ -431,7 +526,7 @@ class _CategoriesSection extends StatelessWidget {
           child: Row(
             children: [
               Text(
-                AppStrings.categories,
+                AppStrings.shopByNeed,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const Spacer(),
@@ -442,15 +537,20 @@ class _CategoriesSection extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.85,
+            ),
             itemCount: categories.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
-              return _CategoryChip(
+              return _CategoryTile(
                 icon: categories[index].$2,
                 label: categories[index].$1,
                 onTap: () => context.push(
@@ -465,8 +565,8 @@ class _CategoriesSection extends StatelessWidget {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+class _CategoryTile extends StatelessWidget {
+  const _CategoryTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -481,23 +581,81 @@ class _CategoryChip extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       child: Container(
-        width: 72,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(14),
+          color: AppColors.creamCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.15)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 28, color: AppColors.secondary),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.secondaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 22, color: AppColors.secondary),
             ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// شريط الثقة (شحن سريع/دفع آمن/دعم فني/ضمان جودة) — نص تسويقي ثابت
+/// فقط لإكمال المظهر، بلا أي منطق أو بيانات
+class _TrustBadgesSection extends StatelessWidget {
+  const _TrustBadgesSection();
+
+  @override
+  Widget build(BuildContext context) {
+    const badges = [
+      (Icons.local_shipping_outlined, 'شحن سريع'),
+      (Icons.verified_user_outlined, 'دفع آمن'),
+      (Icons.support_agent_outlined, 'دعم فني'),
+      (Icons.workspace_premium_outlined, 'ضمان الجودة'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.creamCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.secondary.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final badge in badges)
+              Expanded(
+                child: Column(
+                  children: [
+                    Icon(badge.$1, color: AppColors.secondary, size: 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      badge.$2,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

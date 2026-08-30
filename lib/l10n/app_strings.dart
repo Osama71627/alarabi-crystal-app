@@ -17,6 +17,9 @@ class AppStrings {
   static const done = 'تم';
   static const getStarted = 'ابدأ الآن';
   static const search = 'بحث';
+  static const searchHint = 'ابحث عن ما تريد وأكثر';
+  static const exploreCollection = 'اكتشف المجموعة';
+  static const shopByNeed = 'تسوّق حسب احتياجك';
   static const sortBy = 'ترتيب حسب';
   static const latest = 'الأحدث';
   static const topRated = 'الأعلى تقييماً';

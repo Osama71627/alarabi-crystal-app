@@ -20,6 +20,10 @@ class AppColors {
   static const Color surface = Color(0xFFF5F5F5);
   static const Color surfaceDark = Color(0xFF121212);
 
+  // خلفية كريمية دافئة للشاشة الرئيسية — مطابقة لموقع الشركة arabiacrystal.com
+  static const Color creamBackground = Color(0xFFFBF6EC);
+  static const Color creamCard = Color(0xFFFFFDF8);
+
   // حالة الألوان
   static const Color error = Color(0xFFB00020);
   static const Color success = Color(0xFF4CAF50);
