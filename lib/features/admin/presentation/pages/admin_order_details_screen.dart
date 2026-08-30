@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/widgets/network_image_widget.dart';
 import '../../../../core/widgets/order_status_x.dart';
@@ -93,6 +94,19 @@ class _AdminOrderDetailsScreenState extends State<AdminOrderDetailsScreen> {
       setState(() {
         _future = OrderService.instance.getOrder(widget.orderId);
       });
+    }
+  }
+
+  /// يفتح موقع العميل في تطبيق خرائط جوجل (أو المتصفح إن لم يكن مثبَّتاً) —
+  /// نفس فكرة "إرسال موقعك كرابط" العادية، بلا حاجة لأي SDK خرائط هنا
+  Future<void> _openLocation(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.errorGeneric)),
+      );
     }
   }
 
@@ -213,6 +227,18 @@ class _AdminOrderDetailsScreenState extends State<AdminOrderDetailsScreen> {
                         AppStrings.shippingAddress,
                         order.shippingAddress!,
                       ),
+                    if (order.googleMapsUrl != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openLocation(order.googleMapsUrl!),
+                          icon: const Icon(Icons.location_on_outlined, size: 18),
+                          label: const Text('فتح موقع العميل في خرائط جوجل'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (order.couponCode != null)
                       _row(
                         context,

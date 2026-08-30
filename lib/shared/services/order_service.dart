@@ -54,6 +54,8 @@ class OrderService {
     required PaymentMethod paymentMethod,
     String? couponCode,
     String? shippingAddress,
+    double? shippingLat,
+    double? shippingLng,
     String notes = '',
     int pointsToRedeem = 0,
   }) async {
@@ -64,6 +66,8 @@ class OrderService {
         paymentMethod: paymentMethod,
         couponCode: couponCode,
         shippingAddress: shippingAddress,
+        shippingLat: shippingLat,
+        shippingLng: shippingLng,
         notes: notes,
         pointsToRedeem: pointsToRedeem,
       );

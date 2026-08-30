@@ -41,8 +41,9 @@ class OrderApiUnavailable implements Exception {
 
 /// عميل خدمة الطلبات على الخادم الموثوق.
 ///
-/// ما يُرسَل: معرّفات المنتجات وكمياتها، رمز الكوبون، العنوان، الملاحظات،
-/// عدد النقاط المطلوب استخدامه، ومعرّف محاولة الدفع.
+/// ما يُرسَل: معرّفات المنتجات وكمياتها، رمز الكوبون، العنوان (نصاً
+/// وإحداثيات اختيارية من الخريطة)، الملاحظات، عدد النقاط المطلوب
+/// استخدامه، ومعرّف محاولة الدفع.
 /// ما لا يُرسَل إطلاقاً: السعر، الإجمالي، الخصم، المخزون، usedCount،
 /// userId، حالة الطلب — كلها يقرّرها الخادم من قاعدة البيانات.
 class OrderApi {
@@ -75,6 +76,8 @@ class OrderApi {
     required PaymentMethod paymentMethod,
     String? couponCode,
     String? shippingAddress,
+    double? shippingLat,
+    double? shippingLng,
     String notes = '',
     int pointsToRedeem = 0,
   }) async {
@@ -115,6 +118,8 @@ class OrderApi {
           'paymentMethod': paymentMethod.name,
           if (shippingAddress != null && shippingAddress.isNotEmpty)
             'shippingAddress': shippingAddress,
+          if (shippingLat != null) 'latitude': shippingLat,
+          if (shippingLng != null) 'longitude': shippingLng,
           if (notes.isNotEmpty) 'notes': notes,
           if (pointsToRedeem > 0) 'pointsToRedeem': pointsToRedeem,
         },

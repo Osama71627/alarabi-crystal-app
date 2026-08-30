@@ -64,6 +64,11 @@ dependencies:
     sdk: flutter
   printing: ^5.15.0
   pdf: ^3.13.0
+  # تحديد موقع العميل على خريطة عند إدخال عنوان التوصيل — خريطة مجانية
+  # (OpenStreetMap) بلا مفتاح API أو حساب فوترة (بعكس Google Maps SDK)
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

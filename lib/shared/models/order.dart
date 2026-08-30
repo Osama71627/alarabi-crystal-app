@@ -25,6 +25,8 @@ class Order {
     this.status = OrderStatus.pending,
     this.paymentMethod = PaymentMethod.cod,
     this.shippingAddress,
+    this.shippingLat,
+    this.shippingLng,
     this.shippingFee = 0,
     this.discountAmount = 0,
     this.couponCode,
@@ -42,6 +44,11 @@ class Order {
   final OrderStatus status;
   final PaymentMethod paymentMethod;
   final String? shippingAddress;
+
+  /// إحداثيات موقع العميل على الخريطة (اختيارية — العميل قد لا يحدّدها)،
+  /// تُستخدم لفتح الموقع مباشرة في خرائط جوجل من لوحة الإدارة
+  final double? shippingLat;
+  final double? shippingLng;
   final double shippingFee;
   final double discountAmount;
   final String? couponCode;
@@ -50,6 +57,12 @@ class Order {
   final String notes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// رابط فتح الموقع في خرائط جوجل — null إن لم يحدّد العميل موقعه
+  String? get googleMapsUrl {
+    if (shippingLat == null || shippingLng == null) return null;
+    return 'https://www.google.com/maps/search/?api=1&query=$shippingLat,$shippingLng';
+  }
 
   /// الإجمالي الفرعي (قبل الشحن والخصم)
   double get subtotal => items.fold(0, (sum, item) => sum + item.totalPrice);
@@ -69,6 +82,8 @@ class Order {
       paymentMethod:
           _paymentFromString(map['paymentMethod'] as String? ?? 'cod'),
       shippingAddress: map['shippingAddress'] as String?,
+      shippingLat: (map['shippingLat'] as num?)?.toDouble(),
+      shippingLng: (map['shippingLng'] as num?)?.toDouble(),
       shippingFee: (map['shippingFee'] as num?)?.toDouble() ?? 0,
       discountAmount: (map['discountAmount'] as num?)?.toDouble() ?? 0,
       couponCode: map['couponCode'] as String?,
@@ -92,6 +107,8 @@ class Order {
       'status': status.name,
       'paymentMethod': paymentMethod.name,
       'shippingAddress': shippingAddress,
+      'shippingLat': shippingLat,
+      'shippingLng': shippingLng,
       'shippingFee': shippingFee,
       'discountAmount': discountAmount,
       'couponCode': couponCode,

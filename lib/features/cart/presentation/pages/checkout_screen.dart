@@ -14,6 +14,7 @@ import '../../../../shared/services/loyalty_service.dart';
 import '../../../../shared/services/order_api.dart';
 import '../../../../shared/services/order_service.dart';
 import '../../../../shared/services/order_totals.dart';
+import '../../../../shared/widgets/location_picker_screen.dart';
 
 /// شاشة تأكيد الطلب والدفع
 class CheckoutScreen extends StatefulWidget {
@@ -33,6 +34,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   int _paymentMethod = 0; // 0 = COD, 1 = Bank Transfer
   bool _processing = false;
+
+  /// موقع العميل على الخريطة (اختياري) — يُرسَل مع الطلب حتى تقدر الإدارة
+  /// فتحه مباشرة في خرائط جوجل عند التوصيل
+  double? _latitude;
+  double? _longitude;
 
   /// معرّف محاولة الدفع الحالية.
   ///
@@ -77,6 +83,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return _pointsBalance < maxByAmount ? _pointsBalance : maxByAmount;
   }
 
+  Future<void> _pickLocation() async {
+    final result = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLatitude: _latitude,
+          initialLongitude: _longitude,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+      });
+    }
+  }
+
   Future<void> _placeOrder() async {
     final auth = AuthService.instance;
     if (!auth.isLoggedIn) {
@@ -114,6 +137,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         paymentMethod: paymentMethod,
         couponCode: _cartService.appliedCouponCode,
         shippingAddress: address.isEmpty ? null : address,
+        shippingLat: _latitude,
+        shippingLng: _longitude,
         notes: _notesController.text.trim(),
         pointsToRedeem: pointsToRedeem,
       );
@@ -200,6 +225,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             decoration: const InputDecoration(
               hintText: 'المدينة',
               prefixIcon: Icon(Icons.location_city),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _pickLocation,
+            icon: Icon(
+              _latitude != null ? Icons.check_circle : Icons.map_outlined,
+              color: _latitude != null ? AppColors.success : null,
+            ),
+            label: Text(
+              _latitude != null
+                  ? 'تم تحديد الموقع على الخريطة ✓'
+                  : 'تحديد الموقع على الخريطة (اختياري)',
             ),
           ),
           const SizedBox(height: 24),

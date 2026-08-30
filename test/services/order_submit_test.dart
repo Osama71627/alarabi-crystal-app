@@ -19,6 +19,8 @@ class _FakeOrderApi extends OrderApi {
     required PaymentMethod paymentMethod,
     String? couponCode,
     String? shippingAddress,
+    double? shippingLat,
+    double? shippingLng,
     String notes = '',
     int pointsToRedeem = 0,
   }) async {
