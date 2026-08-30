@@ -37,6 +37,15 @@ class NotificationsFeed {
 
   /// بث الإشعارات التي يملك المستخدم الحالي صلاحية قراءتها، مدموجة ومرتبة
   /// (الأحدث أولاً) بحدّ أعلى [limit].
+  ///
+  /// ⚠️ إصلاح خلل مُبلَّغ: الإشعارات العامة (target: all/category) كانت
+  /// تُجلَب بلا أي قيد زمني، فيرى أي مستخدم جديد **كل** الإشعارات العامة
+  /// منذ إنشاء المتجر (إعلانات منتجات/عروض سبقت وجود حسابه أصلاً). الآن
+  /// تُستبعَد بعد الجلب أي إشعارات عامة سابقة لتاريخ إنشاء حسابه — لا يرى
+  /// إلا ما نُشر بعد انضمامه، تماماً كما يتوقع أي مستخدم جديد.
+  /// المستخدمون الحاليون غير متأثرين عملياً (تاريخ انضمامهم أصلاً يسبق كل
+  /// الإشعارات المعروضة لهم). الاستبعاد يتم في التطبيق لا بشرط Firestore
+  /// إضافي، تفادياً لحاجة فهرس مركّب جديد لم يُتحقَّق من وجوده فعلياً.
   static Stream<List<AdminNotification>> watch({int limit = 100}) {
     if (AuthService.instance.isAdmin) {
       return _collection
@@ -46,13 +55,16 @@ class NotificationsFeed {
           .map((snap) => _parse(snap.docs));
     }
 
-    final uid = AuthService.instance.currentUser?.uid;
+    final currentUser = AuthService.instance.currentUser;
+    final uid = currentUser?.uid;
+    final joinedAt = currentUser?.createdAt;
+
     final publicStream = _collection
         .where('target', whereIn: ['all', 'category'])
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => _parse(snap.docs));
+        .map((snap) => excludeBeforeJoin(_parse(snap.docs), joinedAt));
 
     if (uid == null) {
       return publicStream;
@@ -128,6 +140,19 @@ class NotificationsFeed {
         return yDate.compareTo(xDate);
       });
     return result.length > limit ? result.sublist(0, limit) : result;
+  }
+
+  /// يستبعد أي إشعار سابق لتاريخ انضمام المستخدم — راجع الشرح في [watch].
+  /// إشعار بلا تاريخ إنشاء معروف (createdAt == null) يبقى ظاهراً عمداً
+  /// بدل إخفائه بالخطأ لغموض تاريخه
+  static List<AdminNotification> excludeBeforeJoin(
+    List<AdminNotification> notifications,
+    DateTime? joinedAt,
+  ) {
+    if (joinedAt == null) return notifications;
+    return notifications
+        .where((n) => n.createdAt == null || !n.createdAt!.isBefore(joinedAt))
+        .toList();
   }
 
   static List<AdminNotification> _parse(
